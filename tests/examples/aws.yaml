@@ -1,0 +1,16 @@
+aws:
+    small:
+        region: us-east-1                                               # The region to add this to.
+        access_key_id: FAKE$@!@%YWUTERHGFT                              # AWS Key (In the AWS Console, Top Right: [Your Name] -> Security Credentials)
+        secret_access_key: fake328twigpojasdfoiweitjiogjaspdofjjflk     # + AWS Account Access Key
+        key_pair: secure                                                # Key-Pair to use for connecting via root.
+        security_group: default                                         # AWS Security groups are like firewalls, this is the one to add it to.
+        ami: ami-0ce41865                                               # via http://wiki.debian.org/Cloud/AmazonEC2Image
+        zone: us-east-1c                                                # Zone to put this in, dependant on the region
+        type: m1.small                                                  # The instance type
+        disk_size: 60                                                   # Size of the local disk in GB
+
+    micro:
+        extends: small
+        type: t1.micro
+        disk_size: 20

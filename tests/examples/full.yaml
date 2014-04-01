@@ -1,0 +1,92 @@
+packages:
+    www: contrib+www
+    www: git+http://github.com/deadwisdom/mercantile/blob/master/www.py
+    servers: git+http://github.com/deadwisdom/mercantile/blob/master/server.py
+
+
+# The various servers that will be created
+servers:
+    homegaurd:
+        name: Homegaurd                                     # Name of the server
+        description: ChicagoVPS Enterprise Server           # Description for the MOTD
+        host: 192.3.116.80                                  # Hostname, only found after the instance has been created
+        users: deadwisdom www                               # Users to install, see below
+        packages: teamspeak                                 # Packages to install, see fabfile/<package>.py
+        #packages: www mysql teamspeak                      # Packages to install, see fabfile/<package>.py
+        mysql_root_password: bamgoestheneighborhood         # Root password, error with this must press ok the first time.
+
+    ovid:
+        name: Ovid
+        description: Linode 512
+        host: 50.116.32.51
+        users: deadwisdom www
+        packages: www mysql
+        mysql_root_password: bamgoestheneighborhood
+        
+
+projects:
+    ovid:
+        user: deadwisdom
+        server: ovid
+
+    home:
+        user: deadwisdom                                    # User to own the project directories
+        server: homegaurd                                   # Server to place this project on
+
+    inrelay:
+        user: www
+        git: git@github.com:DeadWisdom/inreach.git
+        static: /static
+        mysql_user: www
+        mysql_password: wenger4ever
+        server: ovid
+        django_settings: settings
+        domains: inreach.deadwisdom.com
+        mysql_name: inrelay
+
+
+# Users
+users:
+    deadwisdom:
+        name: Brantley Harris
+        email: deadwisdom@gmail.com
+        public_key: ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAxj2589dCvYFPVvr4UDnoFEg0NHqRV0u3NmCqkEL3kwkIT4y3GqxdySJyayKC+HKuuWm57i09BatyvQddL63QARsDyBq6u6Yo2Yc8haOaehWjaTe3wi3xWpuf3VZ2srcuoYGK8yJaVIVlYe/V9UtQ6fUope5uY729xUhEb1USR9MHVtAGi+4XwkOFXTurVa3wAgsRASmprch7MdIuWj/ZDWNmHzIz6NQXbXOetq+X4vimkVXy25axDvA5e2G+GiOj8YputavbpqgetJrvEohmPkXFtc2K+AgobToY0ZWIn6hkOsJlolahxjGAtqSXcJS9GZmgjtu27fnAezYcRefzNw== deadwisdom@gmail.com
+        sudo: true                          # Add this user to /etc/sudoers
+    www:
+        name: www
+        email: noreply@example.com
+        supervisor: true                    # This user can sudo on supervisord
+        authorized_keys:                    # Public keys of users that can log into this wihout a password.
+            - ssh-rsa AAAAB3NzaC1yc2EAAAABIwAAAQEAxj2589dCvYFPVvr4UDnoFEg0NHqRV0u3NmCqkEL3kwkIT4y3GqxdySJyayKC+HKuuWm57i09BatyvQddL63QARsDyBq6u6Yo2Yc8haOaehWjaTe3wi3xWpuf3VZ2srcuoYGK8yJaVIVlYe/V9UtQ6fUope5uY729xUhEb1USR9MHVtAGi+4XwkOFXTurVa3wAgsRASmprch7MdIuWj/ZDWNmHzIz6NQXbXOetq+X4vimkVXy25axDvA5e2G+GiOj8YputavbpqgetJrvEohmPkXFtc2K+AgobToY0ZWIn6hkOsJlolahxjGAtqSXcJS9GZmgjtu27fnAezYcRefzNw== deadwisdom@gmail.com
+        public_key: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDCbaBrAGBx08tBfVl7rUoN9a+pAIxLKmcR4X2+F/dDDXWpl8xHHeQX28uqpQYxaKm74RDCItVI/7Ow6irC3nZqdJWZuxQsT6/fz1hSXvLzhbDs5Lg4dD5j/7H6nGcQ4sxQ3ETTxq+hyIDPmy5axxrlyfi6T+FJvTDYdy4mKxebK/WAEOnn/E4BuivGKX8BgBcUDaWXOVWy7jZp7csabdjgoIIqukpadf+u2FkhgtTcB5igQcdGxyjmI9ok3vhc/u4aKJaowlb66TvP6LyLliLGwA+weQfrwR3hFy8fRqSx1rWrFaszyFxEP4cO7hvzMQbESGeSnjLtQnmo0p0/sRG5 deadwisdom@gmail.com
+        private_key: |
+            -----BEGIN RSA PRIVATE KEY-----
+            MIIEowIBAAKCAQEAwm2gawBgcdPLQX1Ze61KDfWvqQCMSypnEeF9vhf3Qw11qZfM
+            Rx3kF9vLqqUGMWipu+EQwiLVSP+zsOoqwt52anSVmbsULE+v389YUl7y84Ww7OS4
+            OHQ+Y/+x+pxnEOLMUNxE08avociAz5suWsca5cn4uk/hSb0w2HcuJisXmyv1gBDp
+            5/xOAborxil/AYAXFA2llzlVsu42ae3LGm3Y4KCCKrpKWnX/rthZIYLU3AeYoEHH
+            Rsco5iPaJN74XP7uGiiWqMJW+uk7z+i8i5YixsAPsHkH68Ed4RcvH0aksda1qxWr
+            M8hcRD+HDu4b8zEGxEhnkp4y7UJ5qNKdP7ERuQIDAQABAoIBAQCw9prmCUe/EuiT
+            SQYjPYyDvDUP+8G1wHhjm/uZA7M4Qo3vuIxjxl8PICz1upIycnLa4HUiXhYHBUWG
+            JvyYtWbOaiKn89DerAEGEnDvOCClae+pDlxmddc7qUVTNvvQML2Kc5Hpt5OwCxDC
+            5RmB4msm73gGDCKfvSUyQPeuIdawkfFBeX5prPpDsOnKQghdbS1OaSVPCImKb9XZ
+            mOFq1ATZ5zpJdvR/nUtgZontpDasbUxBRzNfkOklDY8l6SiW06w8nZXNeaKdW1SJ
+            fabwHZXJi5eNyzn1+OvfEfI4toOsf1HV0ohz5/bh0dB6IcnlAky/bt7BAkfOVQGx
+            MQkud+HpAoGBAO3hI+PqwV0wzTmCwGUTR6YjIYnm79yKcOwAFcuCFbeWftMzzsF3
+            nGCq3u3ymTE4JguF/2ElpeW5opCaftk/EgFXL461crPtZYCjuIX7YaYhkii7y92k
+            TPVI0BadKq3DVIhlFeQ4syHAGe+x+jrL0RCRXJoR675+PNp8wwdv01gvAoGBANE9
+            JiwTyj/bmShKcx/Anmrdpo7cJhtwvRTQAkRva8dg9o0Q0cas9K4s1OdKN0Hw7QHR
+            NVc+FJ2xz5NcLaPx85tUYo26D+wEG36n9c9QhcN4esdsSGWlNw3Sv6cVlgtu3nkG
+            kPJ6xsOpqXK/HH79lwreb7HLx78qr52vs4+Zh1KXAoGAWN2pzcRudkT79gctntTk
+            CGHJbr4ST358jv29JqizOkGDoZ0SGV540fgjjhr6NdP3CokFjaJF5ptB6ul8h+Yy
+            8MNEZfjNIACI0dTX41207h5Oft8hWuy9P0jzS+9s+TsmgknZMsgny2z7g3smsv5f
+            XOQhBwG44xI/45OGPGn/N0sCgYB2kD/hGhWwua6/tfAmPe+GfrKyoOy2/9skv/mI
+            7doU0EzlAnLcMYU0bRL3PIazRuIF9ZZUKUllUixdRA5Yp/FyQw7VYGlFQ86QpnwT
+            TX1+lfZ8qk8bydK4coNHGmQ7dkd6LM5VmFyo4qqx6rkq/GdqMUD5bo9xM67vm3AU
+            HtsfYQKBgAJn5RN+WgnFD/aYVV/GpFXsNpDPjuKeTiOYECnSsU47VbhRat6yt26b
+            FKBuBugTPE1VDeitOq+DsriXhWlLQjvW9nrZ7ven5ruWB4U2s90OncQjitvOTe8M
+            hn5TEh6Rsn21pc1Ii7wlx8ERGXHyyqxn8ouZ/9kwkQBVhP/Emknp
+            -----END RSA PRIVATE KEY-----
+
+
+

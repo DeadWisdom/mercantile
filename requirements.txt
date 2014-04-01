@@ -1,0 +1,11 @@
+Fabric==1.7.0
+Jinja2==2.7.1
+MarkupSafe==0.18
+PyYAML==3.10
+boto==2.13.0
+cssselect==0.8
+lxml==3.2.3
+paramiko==1.11.0
+pycrypto==2.6
+pyquery==1.2.4
+wsgiref==0.1.2
