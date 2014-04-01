@@ -252,7 +252,7 @@ def contents_of_path(path):
     """
     Returns the contents of the file at ``path``.
     """
-    path = os.path.abspath( os.path.join(os.path.dirname(__file__), '..', path) )
+    #path = os.path.abspath( os.path.join(os.path.dirname(__file__), '..', path) )
     with open(path) as file:
         return file.read()
 
