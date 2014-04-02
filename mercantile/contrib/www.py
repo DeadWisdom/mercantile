@@ -1,32 +1,41 @@
 from fabric.api import env, run, sudo, cd, hide, prefix, prompt, settings, show, local, lcd
 from fabric.tasks import execute
-from fabric.contrib.files import append, sed
+from fabric.contrib.files import append, sed, exists
 from fabric.decorators import task
 
-from mercantile.config import config 
+from mercantile.config import config, default_file, default
+from server import put_template
 
+## Templates ##
+config.add('servers', {
+    'server_nginx.conf': unicode | default_file("server_nginx.conf"),
+    'nginx.init': unicode | default_file("nginx.init"),
+    'nginx_version': unicode | default("nginx-1.5.12.tar.gz"),
+    'www_owner': unicode | default("www")
+})
+
+config.add('projects', {
+    'nginx.conf': unicode | default_file("nginx.conf"),
+    'supervisor.conf': unicode | default_file("supervisor.conf"),
+    'uwsgi.conf': unicode | default_file("uwsgi.conf"),
+    'wsgi.py': unicode | default_file("wsgi.py"),
+    'manage.py': unicode | default_file("manage.py"),
+})
 
 ### Tasks ###
 @task
 def build():
     "Builds the www infrastructure."
-    owner = env.server.www_owner or 'www'
+    owner = env.server.www_owner
     env.user = 'root'
 
-    append("/etc/apt/sources.list", "deb http://nginx.org/packages/debian/ squeeze nginx", use_sudo=True)
-    append("/etc/apt/sources.list", "deb-src http://nginx.org/packages/debian/ squeeze nginx", use_sudo=True)
-    
     sudo("apt-get install libpcre3 libpcre3-dev")
     sudo("apt-get update")
-    sudo("apt-get -qy --force-yes install nginx")
 
     with settings(warn_only=True):
         sudo("rm -rf /root/_build")          # Delete previous build files.
         sudo("mkdir /root/_build")           # Create new build file directory.
     
-    print "Installing mysql..."
-    sudo("apt-get -qy install mysql-server")
-   
     print "Building uwsgi..."
     sudo("apt-get -qy install build-essential psmisc libxml2 libxml2-dev")
     with cd("/root/_build"):
@@ -39,38 +48,39 @@ def build():
     
     print "Building nginx..."
     sudo("apt-get -qy install libssl-dev")
-
     with cd("/root/_build"):
-        sudo("wget http://nginx.org/download/nginx-1.4.1.tar.gz")
-        sudo("tar -xzf nginx-1.4.1.tar.gz")
+        sudo("wget http://nginx.org/download/%s" % env.server.nginx_version)
+        sudo("tar -xzf %s" % env.server.nginx_version)
         with cd("nginx*"):
             sudo("./configure")
             sudo("make")
             sudo("make install")
+
+    put_template( env.server['server_nginx.conf'], "/usr/local/nginx/conf/nginx.conf", env.server, use_sudo=True)
     
-    server.put_template( "fabfile/files/uwsgi_params", "/etc/nginx/conf.d/uwsgi_params", {})
-    
-    with settings(warn_only=True):
-        sudo("mkdir /usr/local/nginx/")
-    
-    #sed("/etc/nginx/nginx.conf", r"include /etc/nginx/sites-enabled/\*;", "include /www/*/nginx.conf;", use_sudo=True)
-    sed("/etc/nginx/nginx.conf", r"include /etc/nginx/conf\.d/\*\.conf;", "include /www/*/nginx.conf;", use_sudo=True)
-    sed("/etc/nginx/nginx.conf", r"user\s+nginx;", "user %s;" % owner, use_sudo=True)
     append("/etc/sudoers", "%s ALL=NOPASSWD: /etc/init.d/nginx restart" % owner, use_sudo=True)
+    append("/etc/sudoers", "%s ALL=NOPASSWD: /etc/init.d/nginx reload" % owner, use_sudo=True)
     
     with settings(warn_only=True):
         sudo("rm -rf /root/_build")          # Cleanup
-
+    
     print "Creating /www..."
     with settings(warn_only=True):
         sudo("mkdir /www")
         sudo("chown -R %s:%s /www" % (owner, owner))
-
+    
     print "Adding www to supervisor..."
     sed("/etc/supervisor/supervisord.conf", r"files = .*", r"files = /www/*/supervisor.conf /www/supervisor.conf", use_sudo=True)
     
     print "Restarting www service..."
-    sudo("/etc/init.d/nginx restart")
+    if exists("/etc/init.d/nginx"):
+        with settings(warn_only=True):
+            sudo("/etc/init.d/nginx stop")
+        sudo("/etc/init.d/nginx start")
+    else:
+        put_template( env.server['nginx.init'], "/etc/init.d/nginx", env.server, use_sudo=True)
+        run("chmod 755 /etc/init.d/nginx")
+        sudo("/etc/init.d/nginx start")
 
 
 @task
@@ -85,10 +95,6 @@ def deploy(name=None):
     else:
         name = env.project.key
     config = env.project
-    
-    #server.build_if_needed()
-
-    print env.user
 
     print "Installing project %r..." % name
 
@@ -293,61 +299,4 @@ def restartnginx():
 
     print "Restarting nginx..."
     run("sudo /etc/init.d/nginx restart")
-
-
-@task
-def backup():
-    "Backs up the data and media."
-    apps = [        
-        "analytics",
-        "badges",
-        "calendar",
-        "feedback",
-        "instruction",
-        "project",
-        "site",
-        "interactivity",
-        "laboratory",
-        "quiz",
-        "discourse"
-    ]
-
-    with settings(warn_only=True):
-        run("mkdir /www/%s/data/" % env.project.key)
-        run("ln -s /www/%s/src/media /www/%s/data/media" % (env.project.key, env.project.key))
-        #with cd("/www/%s/data/" % env.project.key):
-        #    run("git init")
-        #    run("git remote add origin git@github.com:Dan-org/dole-data.git")
-        #    run("git checkout -b %s" % env.project.key)
-    
-    with cd_src():
-        print "Creating fixtures for these apps:"
-        for app in apps:
-            print "", app
-    
-        with prefix("source /www/%s/env/bin/activate" % env.project.key):
-            app_string = " ".join(apps)
-            destination = "/www/%s/data/fixtures.json" % env.project.key
-            run("python manage.py cleanup")
-            run("python manage.py dumpdata --indent 2 %s > %s" % (app_string, destination))
-    
-        # version = run("git rev-parse HEAD").strip()
-
-    with cd("/www/%s/data/" % env.project.key):
-        print "syncing media..."
-        run("rsync -az /www/%s/src/media/ media" % env.project.key)
-        print "saving data to git..."
-        #run("git pull -s recursive -X ours origin %s" % env.project.key)
-        #run("git add .")
-        #with settings(warn_only=True):
-        #    output = run("git commit -am 'Backup for %s'" % version)
-        #if output.failed:
-        #    if "nothing to commit" in output:
-        #        print "no changes found"
-        #        return
-        #    else:
-        #        abort("git commit failed")
-        #run("git push origin %s --force" % env.project.key)
-        #print "saved to git"
-
 

@@ -10,6 +10,6 @@ setup( name='mercantile',
        author='Brantley Harris',
        author_email='deadwisdom@gmail.com',
        packages = find_packages(),
-       include_package_data = False,
-       zip_safe = True
+       include_package_data = True,
+       zip_safe = False
       )

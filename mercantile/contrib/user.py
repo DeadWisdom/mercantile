@@ -5,9 +5,23 @@ from fabric.contrib.files import append
 from cStringIO import StringIO
 
 
+### Mercantile ###
+from mercantile.config import config, required, string_list
+
+conf = config.add_group('users', {
+    'name': unicode | required,         # Full name of the user.
+    'email': unicode,                   # Email of the user.
+    'supervisor': bool,                 # Give the user sudo on supervisor via sudoers.
+    'sudo': bool,                       # Add the user to the sudoers.
+    'public_key': unicode,              # Public key of the user.
+    'private_key': unicode,             # Private key of the user.
+    'authorized_keys': [ unicode ],     # List of authorized keys that can log in without a password.
+})
+
+
 ### Helpers ###
 def activate_user(username):
-    env.user = username
+    env.user = conf[username]
 
 
 ### Tasks ###
@@ -18,7 +32,7 @@ def build(username=None):
             build(username)
         return
 
-    user = env.config.users[username]
+    user = conf[username]
     print "Adding user %r..." % (username)
 
     env.user = "root"

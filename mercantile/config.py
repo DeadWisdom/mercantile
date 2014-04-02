@@ -81,7 +81,7 @@ class default(object):
     def __init__(self, value):
         self.value = value
 
-    def __ror__(self):
+    def __ror__(self, fn):
         return Field(None, fn, value=self.value)
 
 
@@ -252,9 +252,14 @@ def contents_of_path(path):
     """
     Returns the contents of the file at ``path``.
     """
-    #path = os.path.abspath( os.path.join(os.path.dirname(__file__), '..', path) )
     with open(path) as file:
         return file.read()
+
+
+def default_file(filename):
+    return default( 
+        os.path.abspath( os.path.join(os.path.dirname(__file__), 'templates', filename) )
+    )
 
 
 config = Config({})

@@ -1,45 +1,50 @@
+import os
 from fabric.decorators import task
 from fabric.tasks import execute
 from fabric.api import env, cd, settings, sudo, run, put, hide, show
 from fabric.contrib.files import append
 from cStringIO import StringIO
 
-from mercantile.config import config, required, string_list, contents_of_path
+from mercantile.config import config, required, string_list, contents_of_path, default_file, default
+
 
 conf = config.add_group('servers', {
-    'name': unicode | required,         # Name of the server. (Required)
-    'description': unicode,             # Description of the server.
-    'host': unicode,                    # IP or host name for the server.
-    'identity': unicode,                # The path to a private key / identity file for root.
-    'users': string_list,               # A list of users to install
-    'packages': string_list,            # A list of packages to install
-    'aws': unicode,                     # The key of an aws config to use.
-    'mysql_root_password': unicode,     # Sets the root mysql password.
-    'www_owner': unicode,               # Name of the user that owns www, defaults to 'www'.
-    'root_password': unicode,           # Password for root, if available.
+    'name': unicode | required,                         # Name of the server. (Required)
+    'description': unicode,                             # Description of the server.
+    'host': unicode,                                    # IP or host name for the server.
+    'identity': unicode,                                # The path to a private key / identity file for root.
+    'users': string_list,                               # A list of users to install
+    'packages': string_list,                            # A list of packages to install
+    'aws': unicode,                                     # The key of an aws config to use.
+    'mysql_root_password': unicode,                     # Sets the root mysql password.
+    'root_password': unicode,                           # Password for root, if available.
+    'language': unicode | default("LANG=en_US.UTF-8"),  # English
+    # Templates
+    'motd.txt': unicode | default_file("motd.txt"),
 })
 
 
 ### Helpers ###
 env.server = None
 def activate(name):
-    env.server = conf[name]
-    if env.server.identity:
+    global conf
+    env.server = conf = conf[name]
+    if conf.identity:
         env.key_filename = env.server.identity
-    if env.server.host:
+    if conf.host:
         env.hosts = [env.server.host]
-    if env.server.aws:
+    if conf.aws:
         import aws
         aws.activate(env.server.aws)
-    if env.server.root_password:
+    if conf.root_password:
         env.user = 'root'
         env.password = env.server.root_password
 
 def build_if_needed():
-    import aws
     print "Looking for server..."
 
     if env.server.aws:
+        import aws
         if aws.exists():
             return
     else:
@@ -72,14 +77,16 @@ def build(name=None):
     Builds the server.
     """
     import user
-    import aws
     
     if name is not None:
         activate(name)
+    elif env.project:
+        env.user = 'root'
+    elif not env.project:
+        abort("Build what?")
     
-    server = env.server
-    
-    if server.aws:
+    if conf.aws:
+        import aws
         aws.build_if_needed()
 
     print "Building the server..."
@@ -121,17 +128,14 @@ def build(name=None):
     sudo("easy_install virtualenv pip==1.0.2")
     
     print "Setting language..."
-    append("/etc/environment", "LANG=en_US.UTF-8", use_sudo=True)
+    append("/etc/environment", conf.language, use_sudo=True)
 
     print "Setting MOTD..."
-    put_template( "fabfile/files/motd.txt", "/etc/motd", server, use_sudo=True)
+    put_template( conf['motd.txt'], "/etc/motd", conf, use_sudo=True)
 
-    for k in server.users:
+    for k in conf.users:
         user.build(k)
-    
-    print "Building packages..."
-    for package in server.packages:
-        execute("%s.build" % package)
+
 
 @task
 def fix_dpkg():

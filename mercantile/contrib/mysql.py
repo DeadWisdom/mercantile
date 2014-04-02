@@ -5,7 +5,8 @@ from fabric.decorators import task
 
 @task
 def build():
-    root_password = env.server.mysql_root_password or env.config.get_dict('mysql').root_password
+    env.user = 'root'
+    root_password = env.server.mysql_root_password
 
     print "Installing mysql..."
     sudo("apt-get -qu install debconf-utils")  # Ensures debconf-set-selections exists.
