@@ -5,11 +5,6 @@ from fabric.api import env, run, sudo, cd, hide, prefix, prompt, settings
 from fabric.contrib.console import confirm
 from fabric.contrib.files import append, sed
 
-try:
-    from boto.ec2 import connect_to_region
-except ImportError:
-    raise ImportError("Boto is not installed, pip install boto or something.")
-
 
 ### Config ###
 from mercantile.config import config, required
@@ -36,6 +31,11 @@ def ec2_connection():
     """
     Create the connection to ec2, raises an error if boto is not installed.
     """
+    try:
+        from boto.ec2 import connect_to_region
+    except ImportError:
+        raise ImportError("Boto is not installed, pip install boto or something.")
+
     if env.aws:
         return env.aws
 
