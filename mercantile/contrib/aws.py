@@ -143,33 +143,32 @@ def build(aws, automated=False):
     if not hasattr(env, 'server'):
         raise RuntimeError("Need a server selected first.")
 
-    config = conf
-
+    print "Finding instance..."
     instance = find_instance(name=env.server.name)
     if instance:
         print "Instance found:", instance.id
     else:
+        print "No instance found, creating..."
         instance = create_instance()
 
     # Security Groups
     print "Authorizing ports %r for the security group." % ((80, 22),)
-    group = find_security_group(config.security_group)
+    group = find_security_group(conf.security_group)
     authorize_tcp_port(group, 80)   # Web
     authorize_tcp_port(group, 22)   # SSH
 
     # Elastic IP
-    for key, server in env.config.servers.items():
-        if server.aws == config.key:
-            address = find_address(server.host)
-            if address:
-                address.associate(instance.id)
-                print "Elastic IP Associated:", address.public_ip
+    if env.server.aws == conf.key:
+        address = find_address(env.server.host)
+        if address:
+            address.associate(instance.id)
+            print "Elastic IP Associated:", address.public_ip
 
     if automated:
         env.user = 'root'
         env.hosts = [instance.public_dns_name]
     else:
-        print "Please update the host in the config, and then run task 'own'."
+        print "Please update the host in the config, you can now use server commands."
         print "Host:", instance.public_dns_name
 
 @aws_task
