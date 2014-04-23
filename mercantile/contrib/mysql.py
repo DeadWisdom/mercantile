@@ -16,6 +16,16 @@ def build():
     sudo("apt-get -qy install mysql-server mysql-client libmysqlclient15-dev")
 
 @task
+def deploy():
+    config = env.project
+    if config.mysql_name:                               # Todo: move to mysql.py
+        print "", "Creating MySQL database..."
+        with settings(warn_only=True):
+            run("mysql --user=root --password=%s --execute=\"CREATE DATABASE %s\"" % (env.server.mysql_root_password, config.mysql_name))
+            run("mysql --user=root --password=%s --execute=\"GRANT ALL ON %s.* TO '%s'@'localhost' IDENTIFIED BY '%s'\"" %
+                 (env.server.mysql_root_password, config.mysql_name, config.mysql_user, config.mysql_password))
+
+@task
 def backup():
 	date = datetime.now().strftime("%Y-%m-%d")
 

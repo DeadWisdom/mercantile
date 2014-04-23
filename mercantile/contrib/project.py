@@ -18,6 +18,7 @@ conf = config.add_group('projects', {
     'django_settings': unicode,         # Marks this a django project with the given settings.
     'domains': string_list,             # A list of domain names to route to this.
     'wsgi': unicode,                    # Marks this a wsgi app with the given application location.
+    'gems': string_list,                # Gems to install when creating the project.
 })
 
 

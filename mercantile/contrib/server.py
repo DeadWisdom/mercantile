@@ -60,13 +60,9 @@ def build_if_needed():
     env.user = save_user
 
 def put_template(local, remote, context, **kwargs):
-    from django.template import Context, Template
-    from django.conf import settings
-    if not settings.configured:
-        settings.configure()
+    from jinja2 import Template
     template = Template(contents_of_path(local))
-    context = Context(context)
-    io = StringIO(template.render(context).encode("ascii"))
+    io = StringIO(template.render(**context).encode("ascii"))
     put( io, remote, **kwargs )
 
 

@@ -22,6 +22,11 @@ config.add('projects', {
     'manage.py': unicode | default_file("manage.py"),
 })
 
+### Helpers ###
+def cd_src():
+    return cd("/www/%s/src" % env.project.key)
+
+
 ### Tasks ###
 @task
 def build():
@@ -31,6 +36,10 @@ def build():
 
     sudo("apt-get install libpcre3 libpcre3-dev")
     sudo("apt-get update")
+
+    if env.project.gems:
+        sudo("apt-get ruby")
+        sudo("gem install %s" % " ".join(env.project.gems))
 
     with settings(warn_only=True):
         sudo("rm -rf /root/_build")          # Delete previous build files.
@@ -43,6 +52,8 @@ def build():
         sudo("tar -xzf uwsgi-latest.tar.gz")
         with cd("uwsgi*"):
             sudo("make")
+            with settings(warn_only=True):
+                sudo("rm /usr/local/sbin/uwsgi")
             sudo("cp uwsgi /usr/local/sbin")
             uwsgi_dir = sudo("pwd")
     
@@ -107,9 +118,9 @@ def deploy(name=None):
     if config.mysql_name:                               # Todo: move to mysql.py
         print "", "Creating MySQL database..."
         with settings(warn_only=True):
-            run("mysql --user=root --password=%s --execute=\"CREATE DATABASE %s\"" % (config.mysql_password, config.mysql_name))
+            run("mysql --user=root --password=%s --execute=\"CREATE DATABASE %s\"" % (env.server.mysql_root_password, config.mysql_name))
             run("mysql --user=root --password=%s --execute=\"GRANT ALL ON %s.* TO '%s'@'localhost' IDENTIFIED BY '%s'\"" %
-                 (config.mysql_password, config.mysql_name, config.mysql_user, config.mysql_password))
+                 (env.server.mysql_root_password, config.mysql_name, config.mysql_user, config.mysql_password))
     
     with cd("/www/%s" % name):
         print "", "Updating repo..."
@@ -133,14 +144,14 @@ def deploy(name=None):
 
     print "Generating config files..."
     for conf in ["nginx.conf", "uwsgi.conf", "supervisor.conf"]:
-        server.put_template( "fabfile/files/%s" % conf, "/www/%s/%s" % (name, conf), config)
+        server.put_template( config[conf], "/www/%s/%s" % (name, conf), config)
 
     print "Generating custom manage.py file..."
-    server.put_template( "fabfile/files/manage.py", "/www/%s/src/manage.py" % name, config)
+    server.put_template( config["manage.py"], "/www/%s/src/manage.py" % name, config)
     run("chmod 755 /www/%s/src/manage.py" % name)
 
     print "Generating custom wsgi.py file..."
-    server.put_template( "fabfile/files/wsgi.py", "/www/%s/src/wsgi.py" % name, config)
+    server.put_template( config["wsgi.py"], "/www/%s/src/wsgi.py" % name, config)
 
     print "Supervisorctl rereading config..."
     run("sudo supervisorctl reread")
@@ -214,12 +225,12 @@ def resetdb():
     if config.mysql_name:
         with settings(warn_only=True):
             print "", "Dropping MySQL database..."
-            run("mysql --user=root --password=%s --execute=\"DROP DATABASE %s\"" % (config.mysql_password, config.mysql_name))
+            run("mysql --user=root --password=%s --execute=\"DROP DATABASE %s\"" % (env.server.mysql_root_password, config.mysql_name))
 
             print "", "Creating MySQL database..."
-            run("mysql --user=root --password=%s --execute=\"CREATE DATABASE %s\"" % (config.mysql_password, config.mysql_name))
+            run("mysql --user=root --password=%s --execute=\"CREATE DATABASE %s\"" % (env.server.mysql_root_password, config.mysql_name))
             run("mysql --user=root --password=%s --execute=\"GRANT ALL ON %s.* TO '%s'@'localhost' IDENTIFIED BY '%s'\"" %
-                 (config.mysql_password, config.mysql_name, config.mysql_user, config.mysql_password))
+                 (env.server.mysql_root_password, config.mysql_name, config.mysql_user, config.mysql_password))
 
 @task
 def force():
@@ -270,28 +281,6 @@ def seed(data_branch='master'):
             run("rm -rf /www/%s/src/media/" % env.project.key)
             run("rsync -vaz %s/media/ /www/%s/src/media/" % (dir, env.project.key))
 
-@task
-def nuke_data_on_qa(data_branch='dev'):
-    """
-    Sometimes you want to seed qa with data from dole-data repository, but testers have added data to qa so git complains about unmerged changes.
-    This will role back qa and git rid of the new changes.
-    Use with caution...
-    """
-    if env.project.key != 'qa':
-        raise RuntimeError("Forbidden except for qa.")
-
-    dir = "/www/%s/data" % env.project.key
-
-    with settings(warn_only=True):
-        run("git clone git@github.com:Dan-org/dole-data.git %s" % dir)
-
-    with cd(dir):
-        print "Bombs away... (qa %s)" % data_branch
-        run('git fetch origin %s' % data_branch)
-        run('git reset --hard FETCH_HEAD')
-        run('git clean -df')
-        print "Nuked"        
-
 
 @task
 def restartnginx():
@@ -300,3 +289,9 @@ def restartnginx():
     print "Restarting nginx..."
     run("sudo /etc/init.d/nginx restart")
 
+
+@task
+def fix():
+    env.user = "deadwisdom"
+    with cd_src():
+        run("sudo killall nginx")
