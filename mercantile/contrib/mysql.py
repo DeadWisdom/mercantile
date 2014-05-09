@@ -35,10 +35,11 @@ def backup():
 	print "Backing up data to /www/%s/db/..." % env.project.key
 	run(
 		"mysqldump -u root -p%s %s | gzip > /www/%s/db/%s.sql.gz" % (
-			env.project.mysql_password,
+			env.server.mysql_root_password,
 			env.project.mysql_name,
 			env.project.key,
 			date,
 		)
 	)
+
 

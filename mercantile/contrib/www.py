@@ -11,7 +11,7 @@ config.add('servers', {
     'server_nginx.conf': unicode | default_file("server_nginx.conf"),
     'nginx.init': unicode | default_file("nginx.init"),
     'nginx_version': unicode | default("nginx-1.5.12.tar.gz"),
-    'www_owner': unicode | default("www")
+    'www_owner': unicode | default("www"),
 })
 
 config.add('projects', {
@@ -20,7 +20,9 @@ config.add('projects', {
     'uwsgi.conf': unicode | default_file("uwsgi.conf"),
     'wsgi.py': unicode | default_file("wsgi.py"),
     'manage.py': unicode | default_file("manage.py"),
+    'is_django': bool | default(False),
 })
+
 
 ### Helpers ###
 def cd_src():
@@ -36,9 +38,10 @@ def build():
 
     sudo("apt-get install libpcre3 libpcre3-dev")
     sudo("apt-get update")
+    sudo("apt-get install rubygems")
 
     if env.project.gems:
-        sudo("apt-get ruby")
+        sudo("apt-get install ruby")
         sudo("gem install %s" % " ".join(env.project.gems))
 
     with settings(warn_only=True):
@@ -143,15 +146,16 @@ def deploy(name=None):
             #run("env/bin/pip install cython -e git+https://github.com/surfly/gevent.git#egg=gevent")
 
     print "Generating config files..."
-    for conf in ["nginx.conf", "uwsgi.conf", "supervisor.conf"]:
-        server.put_template( config[conf], "/www/%s/%s" % (name, conf), config)
+    for c in ["nginx.conf", "uwsgi.conf", "supervisor.conf"]:
+        server.put_template( config[c], "/www/%s/%s" % (name, c), config)
 
-    print "Generating custom manage.py file..."
-    server.put_template( config["manage.py"], "/www/%s/src/manage.py" % name, config)
-    run("chmod 755 /www/%s/src/manage.py" % name)
+    if config['is_django']:
+        print "Generating custom manage.py file..."
+        server.put_template( config["manage.py"], "/www/%s/src/manage.py" % name, config)
+        run("chmod 755 /www/%s/src/manage.py" % name)
 
-    print "Generating custom wsgi.py file..."
-    server.put_template( config["wsgi.py"], "/www/%s/src/wsgi.py" % name, config)
+        print "Generating custom wsgi.py file..."
+        server.put_template( config["wsgi.py"], "/www/%s/src/wsgi.py" % name, config)
 
     print "Supervisorctl rereading config..."
     run("sudo supervisorctl reread")
@@ -200,8 +204,9 @@ def up(branch=None):
             with settings(warn_only=True):
                 run("pip install -r requirements.txt")
 
-            run("python manage.py syncdb --noinput")
-            run("python manage.py collectstatic --noinput")
+            if env.project['is_django']:
+                run("python manage.py syncdb --noinput")
+                run("python manage.py collectstatic --noinput")
 
     print "", "Restarting supervisor job..."
     run("sudo supervisorctl restart %s:uwsgi" % env.project.key)
@@ -215,11 +220,11 @@ def syncdb():
             run("python manage.py syncdb")
 
 @task
-def resetdb():
+def resetdb(force=False):
     "Clears the database, recreates it."
     config = env.project
 
-    if not config.data_transient:
+    if not force and not config.data_transient:
         raise RuntimeError("Forbidden except for projects with `data_transient = True`.")
 
     if config.mysql_name:
@@ -238,19 +243,11 @@ def force():
     env.project.data_transient = True
 
 @task 
-def seed(data_branch='master'):
+def seed(data_branch='master', force=False):
     print "seeding..."
     "Clears the database, recreates it with the data branch."
-    resetdb()
-
-    if data_branch == 'test':
-        print "Loading test fixtures..."
-        with cd_src():
-            with prefix("source /www/%s/env/bin/activate" % env.project.key):
-                run("python manage.py syncdb --noinput")
-                run("python manage.py loaddata testing")
-            return
-
+    resetdb(force=force)
+    
     dir = "/www/%s/data" % env.project.key
 
     #with settings(warn_only=True):
@@ -261,7 +258,7 @@ def seed(data_branch='master'):
     #    run('git remote update')
     #    run('git checkout %s' % data_branch)
     #    run("git pull origin %s" % data_branch)
-
+    
     with cd_src():
         with prefix("source /www/%s/env/bin/activate" % env.project.key):
             print "Syncing database..."
@@ -291,7 +288,19 @@ def restartnginx():
 
 
 @task
-def fix():
-    env.user = "deadwisdom"
-    with cd_src():
-        run("sudo killall nginx")
+def restart():
+    """Restarts uwsgi and nginx"""
+
+    print "", "Restarting supervisor..."
+    run("sudo supervisorctl restart all")
+    
+    print "Restarting nginx..."
+    run("sudo /etc/init.d/nginx restart")
+
+
+
+@task
+def pip_install():
+    with cd("/www/%s" % env.project.key):
+        run("env/bin/pip install -r src/requirements.txt")
+

@@ -111,7 +111,7 @@ def build(name=None):
     sudo("apt-get -qy install sudo")
     sudo("apt-get -qy install git")
     sudo("apt-get -qy install libjpeg62-dev")
-    sudo("apt-get -qy install python-dev python-setuptools")
+    sudo("apt-get -qy install python-dev python-setuptools python-profiler")
     sudo("apt-get -qy install supervisor")
     sudo("apt-get -qy install mercurial")
     sudo("apt-get -qy install libcurl3-openssl-dev")
