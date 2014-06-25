@@ -5,7 +5,7 @@ from fabric.decorators import task
 
 @task
 def build():
-    env.user = 'root'
+    env.user = env.server.root_login
     root_password = env.server.mysql_root_password
 
     print "Installing mysql..."
@@ -42,4 +42,13 @@ def backup():
 		)
 	)
 
+@task
+def reset():
+    config = env.project
+    if config.mysql_name:                               # Todo: move to mysql.py
+        print "", "Destroying MySQL database..."
+        with settings(warn_only=True):
+            run("mysql --user=root --password=%s --execute=\"DROP DATABASE %s\"" % (env.server.mysql_root_password, config.mysql_name))
+    
+    deploy()
 

@@ -34,7 +34,7 @@ def cd_src():
 def build():
     "Builds the www infrastructure."
     owner = env.server.www_owner
-    env.user = 'root'
+    env.user = env.server.root_login
 
     sudo("apt-get install libpcre3 libpcre3-dev")
     sudo("apt-get update")
@@ -144,6 +144,7 @@ def deploy(name=None):
             run("env/bin/pip install -r src/requirements.txt")
             run("env/bin/pip install mysql-python")
             #run("env/bin/pip install cython -e git+https://github.com/surfly/gevent.git#egg=gevent")
+            run("env/bin/pip install gevent")
 
     print "Generating config files..."
     for c in ["nginx.conf", "uwsgi.conf", "supervisor.conf"]:

@@ -35,7 +35,7 @@ def build(username=None):
     user = conf[username]
     print "Adding user %r..." % (username)
 
-    env.user = "root"
+    env.user = env.server.root_login
 
     with settings(warn_only=True):
         sudo("useradd -m -U %s -c \"%s\"" % (username, user.name))
@@ -87,6 +87,6 @@ def build(username=None):
 @task
 def password(username=None):
     """Set the password on the given ``username`` or, if not provided, the current user."""
-    env.user = 'root'
+    env.user = env.server.root_login
     with show("stdout"):
         sudo("passwd %s" % username or env.user)

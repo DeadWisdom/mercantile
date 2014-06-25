@@ -17,6 +17,7 @@ conf = config.add_group('servers', {
     'packages': string_list,                            # A list of packages to install
     'aws': unicode,                                     # The key of an aws config to use.
     'mysql_root_password': unicode,                     # Sets the root mysql password.
+    'root_login': unicode | default('root'),            # Root login
     'root_password': unicode,                           # Password for root, if available.
     'language': unicode | default("LANG=en_US.UTF-8"),  # English
     # Templates
@@ -37,7 +38,7 @@ def activate(name):
         import aws
         aws.activate(env.server.aws)
     if conf.root_password:
-        env.user = 'root'
+        env.user = conf.root_login
         env.password = env.server.root_password
 
 def build_if_needed():
@@ -55,7 +56,7 @@ def build_if_needed():
         except:
             pass
 
-    save_user, env.user = env.user, 'root'
+    save_user, env.user = env.user, env.server.root_login
     build()
     env.user = save_user
 
@@ -77,10 +78,10 @@ def build(name=None):
     if name is not None:
         activate(name)
     elif env.project:
-        env.user = 'root'
+        env.user = env.server.root_login
     elif not env.project:
         abort("Build what?")
-    
+
     if conf.aws:
         import aws
         aws.build_if_needed()
@@ -93,12 +94,14 @@ def build(name=None):
         run("apt-get -qy update")
         run("apt-get -qy install sudo")
     
-    print "Resizing filesystem..."
-    with hide('running', 'stdout', 'stderr', 'status', 'aborts'):
-        with settings(warn_only=True):
-            sudo('resize2fs /dev/xvda1')
+    env.user = env.server.root_login
 
-    print "Updating system..."
+    #print "Resizing filesystem..."
+    #with hide('running', 'stdout', 'stderr', 'status', 'aborts'):
+    #with settings(warn_only=True):
+    #    sudo('resize2fs /dev/xvda1')
+
+    print "Updating system...", env.user
     sudo("apt-get -qy update")
     sudo("apt-get -qy dist-upgrade")
     sudo("apt-get -qy upgrade")

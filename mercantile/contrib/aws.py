@@ -165,7 +165,7 @@ def build(aws, automated=False):
             print "Elastic IP Associated:", address.public_ip
 
     if automated:
-        env.user = 'root'
+        env.user = env.server.root_login
         env.hosts = [instance.public_dns_name]
     else:
         print "Please update the host in the config, you can now use server commands."
