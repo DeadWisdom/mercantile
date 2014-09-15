@@ -16,12 +16,12 @@ conf = config.add_group('servers', {
     'users': string_list,                               # A list of users to install
     'packages': string_list,                            # A list of packages to install
     'aws': unicode,                                     # The key of an aws config to use.
+    'service_root': unicode | default('/srv'),          # Directory root to the services.
     'mysql_root_password': unicode,                     # Sets the root mysql password.
     'root_login': unicode | default('root'),            # Root login
     'root_password': unicode,                           # Password for root, if available.
     'language': unicode | default("LANG=en_US.UTF-8"),  # English
-    # Templates
-    'motd.txt': unicode | default_file("motd.txt"),
+    'motd.txt': unicode | default_file("motd.txt"),     # MOTD Template
 })
 
 
@@ -41,24 +41,6 @@ def activate(name):
         env.user = conf.root_login
         env.password = env.server.root_password
 
-def build_if_needed():
-    print "Looking for server..."
-
-    if env.server.aws:
-        import aws
-        if aws.exists():
-            return
-    else:
-        try:
-            with hide('running', 'stdout', 'stderr', 'status', 'aborts'):
-                run("ls")
-            return
-        except:
-            pass
-
-    save_user, env.user = env.user, env.server.root_login
-    build()
-    env.user = save_user
 
 def put_template(local, remote, context, **kwargs):
     from jinja2 import Template
@@ -77,60 +59,20 @@ def build(name=None):
     
     if name is not None:
         activate(name)
-    elif env.project:
-        env.user = env.server.root_login
-    elif not env.project:
-        abort("Build what?")
 
     if conf.aws:
         import aws
         aws.build_if_needed()
 
-    print "Building the server..."
-    try:
-        with hide('running', 'stdout', 'stderr', 'status', 'aborts'):
-            sudo("ls")   # Check for sudo / access.
-    except:
-        run("apt-get -qy update")
-        run("apt-get -qy install sudo")
-    
     env.user = env.server.root_login
 
-    #print "Resizing filesystem..."
-    #with hide('running', 'stdout', 'stderr', 'status', 'aborts'):
-    #with settings(warn_only=True):
-    #    sudo('resize2fs /dev/xvda1')
-
-    print "Updating system...", env.user
-    sudo("apt-get -qy update")
-    sudo("apt-get -qy dist-upgrade")
-    sudo("apt-get -qy upgrade")
-
-    if env.host:
-        print "Setting hostname..."
-        sudo("hostname %s" % env.host)
-    
-    print "Installing essential packages..."
-    sudo("apt-get -qy install sudo")
-    sudo("apt-get -qy install git")
-    sudo("apt-get -qy install libjpeg62-dev")
-    sudo("apt-get -qy install python-dev python-setuptools python-profiler")
-    sudo("apt-get -qy install supervisor")
-    sudo("apt-get -qy install mercurial")
-    sudo("apt-get -qy install libcurl3-openssl-dev")
-    sudo("apt-get -qy install libxml2-dev libxslt1-dev")
-    sudo("apt-get -qy install screen")
-    sudo("apt-get -qy install redis-server")
-    sudo("apt-get -qy install libevent-dev")
-    sudo("apt-get -qy install libxml2")
-    sudo("apt-get -qy install libxslt1.1")
-    sudo("easy_install virtualenv pip==1.0.2")
-    
-    print "Setting language..."
-    append("/etc/environment", conf.language, use_sudo=True)
-
-    print "Setting MOTD..."
-    put_template( conf['motd.txt'], "/etc/motd", conf, use_sudo=True)
+    ensure_sudo()
+    update()
+    install_essential_packages()
+    install_gems()
+    set_hostname()
+    set_language()
+    set_motd()
 
     for k in conf.users:
         user.build(k)
@@ -139,5 +81,121 @@ def build(name=None):
 @task
 def fix_dpkg():
     "If the dpkg was interupted, this will fix it."
+    print "Fixing package manager..."
+    env.user = env.server.root_login
+
     sudo("dpkg --configure -a")
 
+
+@task
+def update():
+    "Updates the system / upgrades the distribution if available."
+    print "Updating system..."
+    env.user = env.server.root_login
+
+    sudo("apt-get -qy update")
+    sudo("apt-get -qy --force-yes dist-upgrade")
+    sudo("apt-get -qy --force-yes upgrade")
+
+
+@task
+def resize_fs(dev='/dev/xvda1'):
+    "Resize the filesystem on the given device."
+    print "Resizing filesystem..."
+    env.user = env.server.root_login
+
+    sudo('resize2fs %s' % dev)
+
+
+@task
+def ensure_sudo():
+    "Installs sudo if it's not already installed."
+    try:
+        with hide('running', 'stdout', 'stderr', 'status', 'aborts'):
+            sudo("ls")   # Check for sudo / access.
+    except:
+        prev_user, env.user = env.user, env.server.root_login
+        prev_password, env.password = env.password, env.server.root_password
+        run("apt-get -qy update")
+        run("apt-get -qy install sudo")
+        env.user = prev_user
+        env.password = prev_password
+
+@task
+def install_essential_packages():
+    "Installs essential packages."
+    print "Installing essential packages..."
+    env.user = env.server.root_login
+
+    packages = [
+        "sudo",
+        "git",
+        "libjpeg62-dev",
+        "python-dev python-setuptools",
+        "supervisor",
+        "mercurial",
+        "libcurl3-openssl-dev",
+        "screen",
+        "redis-server",
+        "libevent-dev",
+        "libpcre3 libpcre3-dev libssl-dev",
+        "build-essential psmisc libxml2 libxml2-dev libxslt1.1 libxslt1-dev",
+        "libmysqlclient-dev",
+        "ruby",
+    ]
+
+    sudo("apt-get -qy --force-yes install %s" % " ".join(packages))
+    sudo("easy_install virtualenv")
+
+
+@task 
+def install_packages(packages):
+    "Installs the given packages."
+    env.user = env.server.root_login
+
+    sudo("apt-get -qy install %s" % packages)
+
+
+@task
+def set_hostname(host=None):
+    "Sets the hostname to the given ``host`` or the config host."
+    host = host or env.server.host
+    env.user = env.server.root_login
+
+    print "Setting hostname to %r..." % host
+    sudo("hostname %s" % host)
+
+
+@task
+def set_language(lang=None):
+    "Sets the language for the server to the given ``lang`` or the language in the config."
+    lang = lang or env.server.language
+    env.user = env.server.root_login
+
+    print "Setting language to %r..." % lang
+    append("/etc/environment", lang, use_sudo=True)
+
+
+@task
+def set_motd(motd=None):
+    "Sets the Message of the Day for the server to the given ``motd`` or the 'motd.txt' in the config."
+    print "Setting MOTD..."
+    env.user = env.server.root_login
+
+    motd = motd or env.server['motd.txt']
+    put_template( motd, "/etc/motd", env.server, use_sudo=True)
+
+
+@task
+def install_gems(gems=None):
+    "Install the given ruby gems."
+    env.user = env.server.root_login
+
+    if env.project.gems or gems:
+        sudo("apt-get install ruby")
+    
+    if env.project.gems:
+        sudo("gem install %s" % " ".join(env.project.gems))
+
+    if gems:
+        sudo("gem install %s" % " ".join(gems))

@@ -99,20 +99,26 @@ def create_instance():
     """Support function to create a new AWS instance."""
     from boto.ec2.blockdevicemapping import EBSBlockDeviceType, BlockDeviceMapping
 
-    # We want a larger EBS root volume, so override /dev/sda1.
-    dev_root = EBSBlockDeviceType()
-    dev_root.size = conf.disk_size
-    
-    # Create the mapping.
-    dev_mapping = BlockDeviceMapping()
-    dev_mapping['/dev/sda1'] = dev_root 
-
-    reservation = env.aws.run_instances(
-        conf.ami,
+    kwargs = dict(
         instance_type = conf.type, 
         key_name=conf.key_pair,
         placement=conf.zone,
-        block_device_map = dev_mapping)
+    )
+
+    if conf.disk_size:
+        # We want a larger EBS root volume, so override /dev/sda1.
+        dev_root = EBSBlockDeviceType()
+        dev_root.size = conf.disk_size
+    
+        # Create the mapping.
+        dev_mapping = BlockDeviceMapping()
+        dev_mapping['/dev/sda1'] = dev_root 
+
+        kwargs['block_device_map'] = dev_mapping
+
+    reservation = env.aws.run_instances(
+        conf.ami,
+        **kwargs)
 
     instance = env.aws.instance = reservation.instances[0]
     wait_for_status(instance, "Creating server", "running")

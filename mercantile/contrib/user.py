@@ -32,6 +32,7 @@ def build(username=None):
             build(username)
         return
 
+    print conf
     user = conf[username]
     print "Adding user %r..." % (username)
 
@@ -50,10 +51,10 @@ def build(username=None):
             sudo("mkdir .ssh")
         
         # Git
-        if user.name:
-            sudo("git config --global user.name \"%s\"" % user.name, user=username)
-        if user.email:
-            sudo("git config --global user.email \"%s\"" % user.email, user=username)
+        #if user.name:
+        #    sudo("git config --global user.name \"%s\"" % user.name, user=username)
+        #if user.email:
+        #    sudo("git config --global user.email \"%s\"" % user.email, user=username)
 
     # SSH
     if (user.private_key):
