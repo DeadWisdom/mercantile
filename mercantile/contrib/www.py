@@ -104,7 +104,8 @@ def configure_services():
     if not exists(env.server.service_root):
         print "Creating %s..." % env.server.service_root
         sudo("mkdir %s" % env.server.service_root)
-        sudo("chown -R %s:%s %s" % (owner, owner, env.server.service_root))
+    
+    sudo("chown -R %s:%s %s" % (owner, owner, env.server.service_root))
     
     print "Adding %s to supervisor..." % env.server.service_root
     sed("/etc/supervisor/supervisord.conf", r"files = .*", r"files = %s/*/supervisor.conf %s/supervisor.conf" % \
@@ -157,17 +158,19 @@ def build_config():
 @task
 def restart_supervisor():
     "Restarts supervisor."
+    env.user = env.server.root_login
+    
     print "Restarting supervisor..."
     with settings(warn_only=True):
-        result = run("sudo service supervisor restart")
-    
-    if result.failed:
-        run("sudo service supervisor restart")
+        result = run("sudo service supervisor start")
 
+    run("sudo supervisorctl reload")
 
 @task
 def restart_nginx():
     "Restarts nginx."
+    env.user = env.server.root_login
+
     print "Restarting nginx..."
     with settings(warn_only=True):
         result = run("sudo service nginx restart")

@@ -69,6 +69,7 @@ def build(name=None):
     ensure_sudo()
     update()
     install_essential_packages()
+    #install_packages()
     install_gems()
     set_hostname()
     set_language()
@@ -149,11 +150,13 @@ def install_essential_packages():
 
 
 @task 
-def install_packages(packages):
+def install_packages(packages=None):
     "Installs the given packages."
     env.user = env.server.root_login
 
-    sudo("apt-get -qy install %s" % packages)
+    packages = packages or env.server.packages
+    if packages:
+        sudo("apt-get -qy install %s" % packages)
 
 
 @task
