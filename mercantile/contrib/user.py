@@ -32,7 +32,6 @@ def build(username=None):
             build(username)
         return
 
-    print conf
     user = conf[username]
     print "Adding user %r..." % (username)
 

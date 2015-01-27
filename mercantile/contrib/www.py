@@ -49,7 +49,9 @@ def install_uwsgi():
         run("rm -rf ~/_build")          # Delete previous build files.
         run("mkdir ~/_build")           # Create new build file directory.
 
-    with cd("~/_build"):
+    home = run("readlink -f ~")
+
+    with cd("%s/_build" % home):
         run("wget %s" % env.server.uwsgi_src)
         run("tar -xzf %s" % env.server.uwsgi_src.rsplit('/', 1)[-1])
         with cd("uwsgi*"):
@@ -60,39 +62,41 @@ def install_uwsgi():
             uwsgi_dir = run("pwd")
     
     with settings(warn_only=True):
-        sudo("rm -rf ~/_build")          # Cleanup
+        run("rm -rf ~/_build")          # Cleanup
 
 @task
 def install_nginx():
     "Builds and installs nginx."
     env.user = env.server.root_login
-    
-    print "Building nginx..."
-    with settings(warn_only=True):
-        run("rm -rf ~/_build")          # Delete previous build files.
-        run("mkdir ~/_build")           # Create new build file directory.
 
-    with cd("~/_build"):
-        run("wget %s" % env.server.nginx_src)
-        run("tar -xzf %s" % env.server.nginx_src.rsplit('/', 1)[-1])
-        with cd("nginx*"):
-            run("./configure")
-            run("make")
-            sudo("make install")
-            sudo("cp /usr/local/nginx/sbin/nginx /usr/sbin/nginx")
+    #print "Building nginx..."
+    #with settings(warn_only=True):
+    #    run("rm -rf ~/_build")          # Delete previous build files.
+    #    run("mkdir ~/_build")           # Create new build file directory.
+    #
+    #with cd("~/_build"):
+    #    run("wget %s" % env.server.nginx_src)
+    #    run("tar -xzf %s" % env.server.nginx_src.rsplit('/', 1)[-1])
+    #    with cd("nginx*"):
+    #        run("./configure")
+    #        run("make")
+    #        sudo("make install")
+    #        sudo("cp /usr/local/nginx/sbin/nginx /usr/sbin/nginx")
+    #
+    #with settings(warn_only=True):
+    #    run("rm -rf ~/_build")          # Cleanup
+    #
+    #print "Setting up nginx init..."
+    #if not exists("/etc/init.d/nginx"):
+    #    put_template( env.server['nginx.init'], "/etc/init.d/nginx", env.server, use_sudo=True)
+    #    sudo("chmod 755 /etc/init.d/nginx")
+    #    sudo("chown root:root /etc/init.d/nginx")
+    #    sudo("update-rc.d nginx defaults")
 
-    with settings(warn_only=True):
-        run("rm -rf ~/_build")          # Cleanup
-
-    print "Setting up nginx init..."
-    if not exists("/etc/init.d/nginx"):
-        put_template( env.server['nginx.init'], "/etc/init.d/nginx", env.server, use_sudo=True)
-        sudo("chmod 755 /etc/init.d/nginx")
-        sudo("chown root:root /etc/init.d/nginx")
-        sudo("update-rc.d nginx defaults")
+    sudo("apt-get install -qy nginx")
 
     print "Setting up nginx conf..."
-    put_template( env.server['server_nginx.conf'], "/usr/local/nginx/conf/nginx.conf", env.server, use_sudo=True)
+    put_template( env.server['server_nginx.conf'], "/etc/nginx/nginx.conf", env.server, use_sudo=True)
 
 
 @task
@@ -114,6 +118,7 @@ def configure_services():
     print "Adding %r to sudoers..." % owner
     append("/etc/sudoers", "%s ALL=NOPASSWD: /usr/sbin/service nginx restart" % owner, use_sudo=True)
     append("/etc/sudoers", "%s ALL=NOPASSWD: /usr/sbin/service supervisor restart" % owner, use_sudo=True)
+    append("/etc/sudoers", "%s ALL=NOPASSWD: /usr/bin/supervisorctl" % owner, use_sudo=True)
     
 
 @task
