@@ -14,7 +14,8 @@ conf = config.add_group('servers', {
     'host': unicode,                                    # IP or host name for the server.
     'identity': unicode,                                # The path to a private key / identity file for root.
     'users': string_list,                               # A list of users to install
-    'packages': string_list,                            # A list of packages to install
+    'packages': string_list,                            # A list of additional packages to install
+    'pip': string_list,                                 # A list of additional python packages to install
     'aws': unicode,                                     # The key of an aws config to use.
     'service_root': unicode | default('/srv'),          # Directory root to the services.
     'mysql_root_password': unicode,                     # Sets the root mysql password.
@@ -67,10 +68,12 @@ def build(name=None):
     env.user = env.server.root_login
 
     ensure_sudo()
+    fix_dpkg()
     update()
     install_essential_packages()
-    #install_packages()
+    install_packages()
     install_gems()
+    pip_install()
     set_hostname()
     set_language()
     set_motd()
@@ -85,7 +88,11 @@ def fix_dpkg():
     print "Fixing package manager..."
     env.user = env.server.root_login
 
-    sudo("dpkg --configure -a")
+    with settings(warn_only=True):
+        sudo("killall dpkg")
+        sudo("rm /var/lib/dpkg/lock")
+        sudo("dpkg --configure -a")
+
 
 
 @task
@@ -146,7 +153,7 @@ def install_essential_packages():
     ]
 
     sudo("apt-get -qy --force-yes install %s" % " ".join(packages))
-    sudo("easy_install virtualenv")
+    sudo("easy_install virtualenv pip")
 
 
 @task 
@@ -195,10 +202,20 @@ def install_gems(gems=None):
     env.user = env.server.root_login
 
     if env.project.gems or gems:
-        sudo("apt-get install ruby")
+        sudo("apt-get -qy install ruby")
     
     if env.project.gems:
         sudo("gem install %s" % " ".join(env.project.gems))
 
     if gems:
         sudo("gem install %s" % " ".join(gems))
+
+
+@task
+def pip_install(packages=None):
+    "Install the given python packages."
+    env.user = env.server.root_login
+    
+    packages = packages or env.server.pip
+    sudo("pip install %s" % " ".join(packages))
+
